@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Drawing.Text;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -48,6 +49,7 @@ namespace KnyttStories
         private const int MapHeight = 10;
         private const int TileWidth = 24;
         private const int TileHeight = 24;
+        private const int TileSetRow = 16;
         private const int LayerWidth = MapWidth * TileWidth;
         private const int LayerHeight = MapHeight * TileHeight;
 
@@ -119,14 +121,16 @@ namespace KnyttStories
             var boundsBottom = _screens.Values.Max(r => r.Y);
             Bounds = new Rectangle(boundsLeft, boundsTop, boundsRight - boundsLeft + 1, boundsBottom - boundsTop + 1);
         }
+
         /// <summary>
         /// Renders all the screens found within the world grid.
         /// TODO try actually placing Screens as their correct x/y coords?
         /// </summary>
         /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
         /// <param name="removeGhost"></param>
+        /// <param name="withCoords">Draws the X & Y coordinates of each screen.</param>
         /// <returns>The full rendered world map.</returns>
-        public Bitmap Draw(bool removeDebugObjects = true, bool removeGhost = true)
+        public Bitmap Draw(bool removeDebugObjects = true, bool removeGhost = true, bool withCoords = false)
         {
             var worldSize = new Size((Bounds.Right - Bounds.Left + 1) * LayerWidth, LayerHeight);
             var worldRender = new Bitmap(worldSize.Width, worldSize.Height, PixelFormat.Format32bppPArgb);
@@ -135,11 +139,13 @@ namespace KnyttStories
                 canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 canvas.SmoothingMode = SmoothingMode.HighQuality;
+                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                canvas.CompositingQuality = CompositingQuality.HighQuality;
                 canvas.Clear(TransparentColor);
                 var offset = 0;
                 foreach (var screen in _screens.Values)
                 {
-                    canvas.DrawImage(RenderScreen(screen.X, screen.Y, removeDebugObjects, removeGhost), offset, 0,
+                    canvas.DrawImage(RenderScreen(screen.X, screen.Y, removeDebugObjects, removeGhost, withCoords), offset, 0,
                         LayerWidth, LayerHeight);
                     offset += LayerWidth;
                 }
@@ -156,8 +162,9 @@ namespace KnyttStories
         /// <param name="y">The X coordinate of the screen on the world grid.</param>
         /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
         /// <param name="removeGhost"></param>
+        /// <param name="withCoords">Adds the X & Y coordinates to the rendered screen.</param>
         /// <returns>The rendered screen as a bitmap.</returns>
-        public Bitmap RenderScreen(int x, int y, bool removeDebugObjects = true, bool removeGhost = true)
+        public Bitmap RenderScreen(int x, int y, bool removeDebugObjects = true, bool removeGhost = true, bool withCoords = false)
         {
             var screenId = GetScreenId(x, y);
             if (!_screens.ContainsKey(screenId))
@@ -171,6 +178,8 @@ namespace KnyttStories
                 canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 canvas.SmoothingMode = SmoothingMode.HighQuality;
+                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                canvas.CompositingQuality = CompositingQuality.HighQuality;
 
                 var gradientId = _screens[screenId].Settings[Settings.Gradient];
                 using (var gradient =
@@ -199,10 +208,10 @@ namespace KnyttStories
                         if (tile % 128 > 0)
                         {
                             var tileSet = Math.Floor((double) (tile / 128)) == 0 ? tileA : tileB;
-                            var tileX = i % 25 * 24;
+                            var tileX = i % MapWidth * TileWidth;
                             var tileY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
-                            var sourceX = tile % 128 % 16 * 24;
-                            var sourceY = (int) Math.Floor((double) (tile % 128 / 16)) * TileHeight;
+                            var sourceX = tile % 128 % 16 * TileWidth;
+                            var sourceY = (int) Math.Floor((double) (tile % 128 / TileSetRow)) * TileHeight;
 
 
                             canvas.DrawImage(tileSet, new Rectangle(tileX, tileY, TileHeight, TileHeight), sourceX,
@@ -224,7 +233,7 @@ namespace KnyttStories
                         //custom Objects
                         if (objectBank == 255)
                         {
-                            Console.WriteLine("Skipping custom object for now");
+                            Console.WriteLine($"Skipping custom object for now: X={x} Y={y}");
                             continue;
                         }
 
@@ -306,15 +315,31 @@ namespace KnyttStories
                             new Bitmap(GetResourcePath($"Objects/Bank{objectBank}/Object{objectId}.png")))
                         {
                             worldObject.MakeTransparent(Color.FromArgb(255, 0, 255));
-                            var objectX = i % 25 * TileHeight;
-                            var objectY = (int) Math.Floor((double) (i / 25)) * TileHeight;
+                            var objectX = i % MapWidth * TileHeight;
+                            var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
                             canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
                                 worldObject.Height);
                         }
                     }
                 }
+                if (withCoords)
+                {
+                    var rect = new Rectangle(0, 0, LayerWidth, LayerHeight);
+                    using (var gp = new GraphicsPath())
+                    using (var outline = new Pen(Color.Black, 2)
+                        { LineJoin = LineJoin.Round })
+                    using (var sf = new StringFormat())
+                    using (Brush foreBrush = new SolidBrush(Color.White))
+                    {
+                        gp.AddString($"Screen Coords: X={x} Y={y}", FontFamily.GenericMonospace, (int)FontStyle.Regular,
+                            16, rect, sf);
+                        canvas.ScaleTransform(1.3f, 1.35f);
+                        canvas.SmoothingMode = SmoothingMode.HighQuality;
+                        canvas.DrawPath(outline, gp);
+                        canvas.FillPath(foreBrush, gp);
+                    }
+                }
             }
-
             return screenRender;
         }
 
