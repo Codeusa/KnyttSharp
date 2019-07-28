@@ -17,4 +17,7 @@ This program is able read compressed Knytt Stories levels (.knytt.bin), allowing
 ./KnyttSharp "E:/Knytt Stories/Test/Drakkan - Nifflas - The Machine.knytt.bin" "E:/Knytt Stories/Test/Dump/" "E:/Knytt Stories/Data/"
 ```
 
-See the full example source for API usage.. 
+See the full [example source](https://github.com/Codeusa/KnyttSharp/blob/master/KnyttStories/Program.cs) for API usage.. 
+
+
+[Follow my Twitter](https://twitter.com/andrewmd5)
