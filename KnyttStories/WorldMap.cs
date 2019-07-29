@@ -309,8 +309,8 @@ namespace KnyttStories
                 using (var tileA = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileAId}.png"))))
                 using (var tileB = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileBId}.png"))))
                 {
-                    tileA.MakeTransparent();
-                    tileB.MakeTransparent();
+                    tileA.MakeTransparent(TransparentColor);
+                    tileB.MakeTransparent(TransparentColor);
 
                     //Draw our initial tile layers.
                     for (byte layer = 0; layer < 4; layer++)
@@ -363,6 +363,8 @@ namespace KnyttStories
                             using (var customGameObject =
                                 new Bitmap(GetCustomResourcePath($"Custom Objects/{customImage}")))
                             {
+
+                                customGameObject.MakeTransparent(TransparentColor);
                                 var sourceX = frame %
                                               (customGameObject.Width / customTileWidth) *
                                               customTileWidth;
@@ -471,7 +473,7 @@ namespace KnyttStories
                         using (var worldObject =
                             new Bitmap(GetResourcePath($"Objects/Bank{objectBankId}/Object{gameObjectId}.png")))
                         {
-                            worldObject.MakeTransparent(Color.FromArgb(255, 0, 255));
+                            worldObject.MakeTransparent(TransparentColor);
                             var objectX = i % MapWidth * TileHeight;
                             var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
                             canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
@@ -499,7 +501,6 @@ namespace KnyttStories
                     }
                 }
             }
-
             return screenRender;
         }
 
