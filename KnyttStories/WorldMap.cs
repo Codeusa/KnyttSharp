@@ -21,7 +21,7 @@ namespace KnyttStories
     }
 
     /// <summary>
-    /// A basic store for screen information.
+    ///     A basic model for screen information.
     /// </summary>
     internal class Screen
     {
@@ -35,13 +35,14 @@ namespace KnyttStories
 
         public override string ToString()
         {
-            return $"x{X}y{Y}";
+            return $"X={X} Y={Y}";
         }
     }
 
+
     /// <summary>
-    /// This class allows you to read a Map.bin file which represents a Knytt Stories world.
-    /// Once loaded, you can then render the actual level and all of its contents to an image.
+    ///     This class allows you to read a Map.bin file which represents a Knytt Stories world.
+    ///     Once loaded, you can then render the actual level and all of its contents to an image.
     /// </summary>
     public class WorldMap
     {
@@ -53,14 +54,24 @@ namespace KnyttStories
         private const int LayerWidth = MapWidth * TileWidth;
         private const int LayerHeight = MapHeight * TileHeight;
 
-        private static readonly Color TransparentColor = Color.FromArgb(255, 0, 255);
-        private readonly string _dataFolder;
-        private readonly string _mapPath;
+        internal static readonly Color TransparentColor = Color.FromArgb(255, 0, 255);
 
-        private readonly Dictionary<int, Screen> _screens;
+        private readonly string _dataFolder;
 
         /// <summary>
-        /// 
+        ///     An instance that allows us to read values from World.ini
+        /// </summary>
+        private readonly WorldIni _ini;
+
+        private readonly string _mapPath;
+
+        /// <summary>
+        ///     A collection of all the screens found in Map.bin
+        /// </summary>
+        private readonly Dictionary<int, Screen> _screens;
+
+
+        /// <summary>
         /// </summary>
         /// <param name="mapPath">The path to the folder containing Map.bin</param>
         /// <param name="dataFolder">The path to your primary Knytt Stories Data folder.</param>
@@ -69,307 +80,37 @@ namespace KnyttStories
             _mapPath = mapPath;
             _dataFolder = dataFolder;
             _screens = new Dictionary<int, Screen>();
+            _ini = new WorldIni(_mapPath);
         }
 
         /// <summary>
-        /// The Calculated game world grid.
+        ///     The Calculated game world grid.
         /// </summary>
         public Rectangle Bounds { get; private set; }
 
         /// <summary>
-        /// Decompresses a GZIP file.
+        ///     The name of the world.
         /// </summary>
-        /// <param name="memoryStream"></param>
-        /// <param name="mapFile"></param>
-        private static void DecompressMap(Stream memoryStream, string mapFile)
-        {
-            using (var fileStream = File.OpenRead(mapFile))
-            {
-                //not a valid gzip file.
-                if (fileStream.ReadByte() != 31 || fileStream.ReadByte() != 139) return;
-                fileStream.Seek(0, SeekOrigin.Begin);
-                using (var decompressionStream = new GZipStream(fileStream, CompressionMode.Decompress))
-                {
-                    decompressionStream.CopyTo(memoryStream);
-                    memoryStream.Seek(0, SeekOrigin.Begin);
-                }
-            }
-        }
+        public string Name { get; private set; }
 
         /// <summary>
-        /// Generates a unique ID for a screen based on an X and Y coordinate pair. 
+        ///     The original author of the world.
         /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <returns></returns>
-        private static int GetScreenId(int x, int y)
-        {
-            var screenId = 23;
-            screenId = screenId * 37 + x;
-            screenId = screenId * 37 + y;
-            return screenId;
-        }
+        public string Author { get; private set; }
 
         /// <summary>
-        /// Calculates the rectangle bounds of the world grid.
+        ///     The described size of the world.
         /// </summary>
-        private void CalculateWorldBounds()
-        {
-            var boundsLeft = _screens.Values.Min(r => r.X);
-            var boundsTop = _screens.Values.Min(r => r.Y);
-            var boundsRight = _screens.Values.Max(r => r.X);
-            var boundsBottom = _screens.Values.Max(r => r.Y);
-            Bounds = new Rectangle(boundsLeft, boundsTop, boundsRight - boundsLeft + 1, boundsBottom - boundsTop + 1);
-        }
+        public string Size { get; private set; }
 
         /// <summary>
-        /// Renders all the screens found within the world grid.
-        /// TODO try actually placing Screens as their correct x/y coords?
+        ///     A description attached to the world.
         /// </summary>
-        /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
-        /// <param name="removeGhost"></param>
-        /// <param name="withCoords">Draws the X & Y coordinates of each screen.</param>
-        /// <returns>The full rendered world map.</returns>
-        public Bitmap Draw(bool removeDebugObjects = true, bool removeGhost = true, bool withCoords = false)
-        {
-            var worldSize = new Size((Bounds.Right - Bounds.Left + 1) * LayerWidth, LayerHeight);
-            var worldRender = new Bitmap(worldSize.Width, worldSize.Height, PixelFormat.Format32bppPArgb);
-            using (var canvas = Graphics.FromImage(worldRender))
-            {
-                canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                canvas.SmoothingMode = SmoothingMode.HighQuality;
-                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                canvas.CompositingQuality = CompositingQuality.HighQuality;
-                canvas.Clear(TransparentColor);
-                var offset = 0;
-                foreach (var screen in _screens.Values)
-                {
-                    canvas.DrawImage(RenderScreen(screen.X, screen.Y, removeDebugObjects, removeGhost, withCoords), offset, 0,
-                        LayerWidth, LayerHeight);
-                    offset += LayerWidth;
-                }
-            }
+        public string Description { get; private set; }
 
-            return worldRender;
-        }
 
         /// <summary>
-        /// Game worlds in Knytt Stories are composed of screens placed on a grid.
-        /// Calling this will access one of those screens, rendering all of its layers (gradients, landscape, sprites.)
-        /// </summary>
-        /// <param name="x">The X coordinate of the screen on the world grid.</param>
-        /// <param name="y">The X coordinate of the screen on the world grid.</param>
-        /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
-        /// <param name="removeGhost"></param>
-        /// <param name="withCoords">Adds the X & Y coordinates to the rendered screen.</param>
-        /// <returns>The rendered screen as a bitmap.</returns>
-        public Bitmap RenderScreen(int x, int y, bool removeDebugObjects = true, bool removeGhost = true, bool withCoords = false)
-        {
-            var screenId = GetScreenId(x, y);
-            if (!_screens.ContainsKey(screenId))
-            {
-                Console.WriteLine($"There is not {x}/{y} screen");
-                return null;
-            }
-            var screenRender = new Bitmap(LayerWidth, LayerHeight, PixelFormat.Format32bppPArgb);
-            using (var canvas = Graphics.FromImage(screenRender))
-            {
-                canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                canvas.SmoothingMode = SmoothingMode.HighQuality;
-                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                canvas.CompositingQuality = CompositingQuality.HighQuality;
-
-                var gradientId = _screens[screenId].Settings[Settings.Gradient];
-                using (var gradient =
-                    new Bitmap(Image.FromFile(GetResourcePath($"Gradients/Gradient{gradientId}.png"))))
-                {
-                    gradient.MakeTransparent(TransparentColor);
-                    //draw gradients
-                    for (var i = 0; i < Math.Ceiling(1000.0 / gradient.Width); i++)
-                        canvas.DrawImage(gradient, i * gradient.Width, 0, gradient.Width, LayerHeight);
-                }
-
-                var tileAId = _screens[screenId].Settings[Settings.TileSetA];
-                var tileBId = _screens[screenId].Settings[Settings.TileSetB];
-
-                using (var tileA = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileAId}.png"))))
-                using (var tileB = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileBId}.png"))))
-                {
-                    tileA.MakeTransparent();
-                    tileB.MakeTransparent();
-
-                    //Draw our initial tile layers.
-                    for (byte layer = 0; layer < 4; layer++)
-                    for (var i = 0; i < 250; i++)
-                    {
-                        var tile = GetTile(screenId, layer, i);
-                        if (tile % 128 > 0)
-                        {
-                            var tileSet = Math.Floor((double) (tile / 128)) == 0 ? tileA : tileB;
-                            var tileX = i % MapWidth * TileWidth;
-                            var tileY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
-                            var sourceX = tile % 128 % 16 * TileWidth;
-                            var sourceY = (int) Math.Floor((double) (tile % 128 / TileSetRow)) * TileHeight;
-
-
-                            canvas.DrawImage(tileSet, new Rectangle(tileX, tileY, TileHeight, TileHeight), sourceX,
-                                sourceY, TileHeight, TileHeight,
-                                GraphicsUnit.Pixel);
-                        }
-                    }
-                }
-
-                //Here is our object/sprite layers.
-                for (byte layer = 4; layer < 8; layer++)
-                for (var i = 0; i < 250; i++)
-                {
-                    var objectId = GetTile(screenId, layer, i);
-                    if (objectId > 0)
-                    {
-                        var objectBank = GetTile(screenId, layer, i + 250);
-
-                        //custom Objects
-                        if (objectBank == 255)
-                        {
-                            Console.WriteLine($"Skipping custom object for now: X={x} Y={y}");
-                            continue;
-                        }
-
-                        var drawObject = true;
-                        if (removeDebugObjects)
-                        {
-                            //System objects
-                            if (objectBank == 0 &&
-                                (objectId == 2 || objectId >= 11 && objectId <= 20 || objectId >= 25))
-                            {
-                                drawObject = false;
-                            }
-                            // Ghost [X] Wall
-                            else if (objectBank == 12 && objectId == 17)
-                            {
-                                drawObject = false;
-                            }
-                            //Invisible
-                            else if (objectBank == 16)
-                            {
-                                drawObject = false;
-                            }
-                            //Fly A B
-                            else if (objectBank == 2 && (objectId == 3 || objectId == 4))
-                            {
-                                drawObject = false;
-                            }
-                            //Decoration
-                            else if (objectBank == 8 && objectId >= 15 && objectId <= 17)
-                            {
-                                drawObject = false;
-                            }
-                            //Nature FX
-                            else if (objectBank == 7 &&
-                                     (objectId == 1 || objectId == 10 || objectId == 12 || objectId == 14 ||
-                                      objectId == 16 || objectId == 3 || objectId == 6 || objectId == 8))
-                            {
-                                drawObject = false;
-                            }
-                            //Ghosts
-                            else if (objectBank == 12 && removeGhost)
-                            {
-                                drawObject = false;
-                            }
-                            //Robots
-                            else if (objectBank == 13 && (objectId == 7 || objectId == 10))
-                            {
-                                drawObject = false;
-                            }
-                            //Robots (redirection)
-                            else if (objectBank == 13)
-                            {
-                                //Lasers
-                                if (objectId == 8 || objectId == 11) objectId++;
-                            }
-                            //Objects & Areas (redirection)
-                            else if (objectBank == 15)
-                            {
-                                //Password switches
-                                if (objectId >= 14 && objectId <= 21)
-                                    objectId = 13;
-                                //Disappearing blocks
-                                else if (objectId >= 8 && objectId <= 11)
-                                    objectId -= 7;
-                                //Blue blocks
-                                else if (objectId == 6)
-                                    drawObject = false;
-                                else if (objectId == 7) objectId = 6;
-                            }
-                            //Traps (redirections)
-                            else if (objectBank == 6 && objectId == 6)
-                            {
-                                objectBank = 8;
-                            }
-                        }
-
-                        if (!drawObject) continue;
-                        using (var worldObject =
-                            new Bitmap(GetResourcePath($"Objects/Bank{objectBank}/Object{objectId}.png")))
-                        {
-                            worldObject.MakeTransparent(Color.FromArgb(255, 0, 255));
-                            var objectX = i % MapWidth * TileHeight;
-                            var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
-                            canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
-                                worldObject.Height);
-                        }
-                    }
-                }
-                if (withCoords)
-                {
-                    var rect = new Rectangle(0, 0, LayerWidth, LayerHeight);
-                    using (var gp = new GraphicsPath())
-                    using (var outline = new Pen(Color.Black, 2)
-                        { LineJoin = LineJoin.Round })
-                    using (var sf = new StringFormat())
-                    using (Brush foreBrush = new SolidBrush(Color.White))
-                    {
-                        gp.AddString($"Screen Coords: X={x} Y={y}", FontFamily.GenericMonospace, (int)FontStyle.Regular,
-                            16, rect, sf);
-                        canvas.ScaleTransform(1.3f, 1.35f);
-                        canvas.SmoothingMode = SmoothingMode.HighQuality;
-                        canvas.DrawPath(outline, gp);
-                        canvas.FillPath(foreBrush, gp);
-                    }
-                }
-            }
-            return screenRender;
-        }
-
-        /// <summary>
-        /// Retrieves a tile from a screens layer.
-        /// </summary>
-        /// <param name="screenId"></param>
-        /// <param name="layer"></param>
-        /// <param name="tile"></param>
-        /// <returns></returns>
-        private int GetTile(int screenId, byte layer, int tile)
-        {
-            return _screens[screenId].Layers[layer][tile];
-        }
-
-        /// <summary>
-        /// Look's in the "Data" folder for a resource.
-        /// </summary>
-        /// <param name="resourceName"></param>
-        /// <returns></returns>
-        private string GetResourcePath(string resourceName)
-        {
-            var dataBasedPath = Path.Combine(_dataFolder, resourceName);
-            if (File.Exists(dataBasedPath)) return dataBasedPath;
-            Console.WriteLine(dataBasedPath);
-            return null;
-        }
-
-        /// <summary>
-        /// Decompresses a Knytt Stories "Map.bin" and loads the contents.
+        ///     Decompresses a Knytt Stories "Map.bin" and loads the contents.
         /// </summary>
         /// <param name="mapFile"></param>
         /// <returns></returns>
@@ -417,8 +158,387 @@ namespace KnyttStories
                     _screens[GetScreenId(screen.X, screen.Y)] = screen;
                 }
             }
+
             CalculateWorldBounds();
+            ReadWorldMetadata();
             return true;
+        }
+
+        /// <summary>
+        ///     Reads metadata from the [World] section of the World.ini file
+        /// </summary>
+        private void ReadWorldMetadata()
+        {
+            Name = _ini.Read("World", "Name");
+            Author = _ini.Read("World", "Author");
+            Description = _ini.Read("World", "Description");
+            Size = _ini.Read("World", "Size");
+        }
+
+
+        /// <summary>
+        ///     Decompresses a GZIP file.
+        /// </summary>
+        /// <param name="memoryStream"></param>
+        /// <param name="mapFile"></param>
+        private static void DecompressMap(Stream memoryStream, string mapFile)
+        {
+            using (var fileStream = File.OpenRead(mapFile))
+            {
+                //not a valid gzip file.
+                if (fileStream.ReadByte() != 31 || fileStream.ReadByte() != 139) return;
+                fileStream.Seek(0, SeekOrigin.Begin);
+                using (var decompressionStream = new GZipStream(fileStream, CompressionMode.Decompress))
+                {
+                    decompressionStream.CopyTo(memoryStream);
+                    memoryStream.Seek(0, SeekOrigin.Begin);
+                }
+            }
+        }
+
+
+        /// <summary>
+        ///     Generates a unique ID for a screen based on an X and Y coordinate pair.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <returns></returns>
+        private static int GetScreenId(int x, int y)
+        {
+            var screenId = 23;
+            screenId = screenId * 37 + x;
+            screenId = screenId * 37 + y;
+            return screenId;
+        }
+
+        /// <summary>
+        ///     Calculates the rectangle bounds of the world grid.
+        /// </summary>
+        private void CalculateWorldBounds()
+        {
+            var boundsLeft = _screens.Values.Min(r => r.X);
+            var boundsTop = _screens.Values.Min(r => r.Y);
+            var boundsRight = _screens.Values.Max(r => r.X);
+            var boundsBottom = _screens.Values.Max(r => r.Y);
+            Bounds = new Rectangle(boundsLeft, boundsTop, boundsRight - boundsLeft + 1, boundsBottom - boundsTop + 1);
+        }
+
+        /// <summary>
+        ///     Renders all the screens found within the world grid.
+        ///     TODO try actually placing Screens as their correct x/y coords?
+        /// </summary>
+        /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
+        /// <param name="removeGhost"></param>
+        /// <param name="withCoords">Draws the X & Y coordinates of each screen.</param>
+        /// <returns>The full rendered world map.</returns>
+        public Bitmap Draw(bool removeDebugObjects = true, bool removeGhost = true, bool withCoords = false)
+        {
+            var columns = 6;
+            var totalRows = (int) Math.Ceiling(_screens.Count / (double) columns);
+            var totalWidth = columns * LayerWidth + (columns - 1);
+            var totalHeight = totalRows * LayerHeight + (totalRows - 1);
+            var worldRender = new Bitmap(totalWidth, totalHeight, PixelFormat.Format32bppPArgb);
+            using (var canvas = Graphics.FromImage(worldRender))
+            {
+                canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                canvas.SmoothingMode = SmoothingMode.HighQuality;
+                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                canvas.CompositingQuality = CompositingQuality.HighQuality;
+                canvas.Clear(TransparentColor);
+                var i = 0;
+                var row = 0;
+                foreach (var screen in _screens.Values)
+                {
+                    if (i > 0 && i % columns == 0) row++;
+                    var column = i % columns;
+                    var destinationX = column * LayerWidth;
+                    var destinationY = row * LayerHeight;
+                    using (var screenRender = RenderScreen(screen.X, screen.Y, removeDebugObjects, removeGhost, withCoords))
+                    {
+                        canvas.DrawImage(screenRender, destinationX, destinationY, LayerWidth, LayerHeight);
+                        i++;
+                    }
+                }
+            }
+            worldRender.MakeTransparent(TransparentColor);
+            return worldRender;
+        }
+
+        /// <summary>
+        ///     Game worlds in Knytt Stories are composed of screens placed on a grid.
+        ///     Calling this will access one of those screens, rendering all of its layers (gradients, landscape, sprites.)
+        /// </summary>
+        /// <param name="x">The X coordinate of the screen on the world grid.</param>
+        /// <param name="y">The X coordinate of the screen on the world grid.</param>
+        /// <param name="removeDebugObjects">Removes otherwise useless objects from the render.</param>
+        /// <param name="removeGhost"></param>
+        /// <param name="withCoords">Adds the X & Y coordinates to the rendered screen.</param>
+        /// <returns>The rendered screen as a bitmap.</returns>
+        public Bitmap RenderScreen(int x, int y, bool removeDebugObjects = true, bool removeGhost = true,
+            bool withCoords = false)
+        {
+            var screenId = GetScreenId(x, y);
+            if (!_screens.ContainsKey(screenId))
+            {
+                Console.WriteLine($"There is not {x}/{y} screen");
+                return null;
+            }
+
+            var screenRender = new Bitmap(LayerWidth, LayerHeight, PixelFormat.Format32bppPArgb);
+            using (var canvas = Graphics.FromImage(screenRender))
+            {
+                canvas.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                canvas.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                canvas.SmoothingMode = SmoothingMode.HighQuality;
+                canvas.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                canvas.CompositingQuality = CompositingQuality.HighQuality;
+
+                var gradientId = _screens[screenId].Settings[Settings.Gradient];
+                using (var gradient = new Bitmap(Image.FromFile(GetResourcePath($"Gradients/Gradient{gradientId}.png"))))
+                {
+                    gradient.MakeTransparent(TransparentColor);
+                    //draw gradients
+                    for (var i = 0; i < Math.Ceiling(1000.0 / gradient.Width); i++)
+                        canvas.DrawImage(gradient, i * gradient.Width, 0, gradient.Width, LayerHeight);
+                }
+
+                var tileAId = _screens[screenId].Settings[Settings.TileSetA];
+                var tileBId = _screens[screenId].Settings[Settings.TileSetB];
+
+                using (var tileA = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileAId}.png"))))
+                using (var tileB = new Bitmap(Image.FromFile(GetResourcePath($"Tilesets/Tileset{tileBId}.png"))))
+                {
+                    tileA.MakeTransparent();
+                    tileB.MakeTransparent();
+
+                    //Draw our initial tile layers.
+                    for (byte layer = 0; layer < 4; layer++)
+                    for (var i = 0; i < 250; i++)
+                    {
+                        var tile = GetTile(screenId, layer, i);
+                        if (tile % 128 > 0)
+                        {
+                            var tileSet = Math.Floor((double) (tile / 128)) == 0 ? tileA : tileB;
+                            var tileX = i % MapWidth * TileWidth;
+                            var tileY = (int) Math.Floor(i / (double) MapWidth) * TileHeight;
+                            var sourceX = tile % 128 % 16 * TileWidth;
+                            var sourceY = (int) Math.Floor(tile % 128 / (double) TileSetRow) * TileHeight;
+                            var tileBounds = new Rectangle(tileX, tileY, TileHeight, TileHeight);
+
+                            canvas.DrawImage(tileSet, tileBounds, sourceX,
+                                sourceY, TileHeight, TileHeight,
+                                GraphicsUnit.Pixel);
+                        }
+                    }
+                }
+
+                //Here is our object/sprite layers.
+                for (byte layer = 4; layer < 8; layer++)
+                for (var i = 0; i < 250; i++)
+                {
+                    var gameObjectId = GetTile(screenId, layer, i);
+                    if (gameObjectId > 0)
+                    {
+                        var objectBankId = GetTile(screenId, layer, i + 250);
+
+                        //custom Objects
+                        if (objectBankId == 255)
+                        {
+                            var customSection = $"Custom Object {gameObjectId}";
+                            var customImage = _ini.Read(customSection, "Image");
+                            if (string.IsNullOrWhiteSpace(customImage))
+                            {
+                                Console.WriteLine(
+                                    $"Unable to locate information for Object ID {gameObjectId} in World Custom Objects");
+                                continue;
+                            }
+
+                            var customTileWidth = _ini.ReadInt(customSection, "Tile Width") ?? TileWidth;
+                            var customTileHeight = _ini.ReadInt(customSection, "Tile Height") ?? TileHeight;
+                            var customOffsetX = _ini.ReadInt(customSection, "Offset X") ?? 0;
+                            var customOffsetY = _ini.ReadInt(customSection, "Offset Y") ?? 0;
+                            var frame = _ini.ReadInt(customSection, "Init AnimFrom") ?? 0;
+
+                            using (var customGameObject =
+                                new Bitmap(GetCustomResourcePath($"Custom Objects/{customImage}")))
+                            {
+                                var sourceX = frame %
+                                              (customGameObject.Width / customTileWidth) *
+                                              customTileWidth;
+
+                                var sourceY = (int) Math.Floor(frame /
+                                                               (customGameObject.Width /
+                                                                (double) customTileWidth)) *
+                                              customTileHeight;
+
+                                var destinationX = i % MapWidth * TileHeight + 12 -
+                                                   Math.Floor((double) customTileWidth / 2) +
+                                                   customOffsetX;
+
+                                var destinationY = Math.Floor((double) i / MapWidth) * TileHeight + 12 -
+                                                   Math.Floor((double) customTileHeight / 2) +
+                                                   customOffsetY;
+
+                                var customObjectBounds = new Rectangle((int) destinationX, (int) destinationY,
+                                    customTileWidth,
+                                    customTileHeight);
+
+                                canvas.DrawImage(customGameObject, customObjectBounds, sourceX,
+                                    sourceY, customTileWidth, customTileHeight,
+                                    GraphicsUnit.Pixel);
+                            }
+
+                            continue;
+                        }
+
+                        var drawObject = true;
+                        if (removeDebugObjects)
+                        {
+                            //System objects
+                            if (objectBankId == 0 &&
+                                (gameObjectId == 2 || gameObjectId >= 11 && gameObjectId <= 20 || gameObjectId >= 25))
+                            {
+                                drawObject = false;
+                            }
+                            // Ghost [X] Wall
+                            else if (objectBankId == 12 && gameObjectId == 17)
+                            {
+                                drawObject = false;
+                            }
+                            //Invisible
+                            else if (objectBankId == 16)
+                            {
+                                drawObject = false;
+                            }
+                            //Fly A B
+                            else if (objectBankId == 2 && (gameObjectId == 3 || gameObjectId == 4))
+                            {
+                                drawObject = false;
+                            }
+                            //Decoration
+                            else if (objectBankId == 8 && gameObjectId >= 15 && gameObjectId <= 17)
+                            {
+                                drawObject = false;
+                            }
+                            //Nature FX
+                            else if (objectBankId == 7 &&
+                                     (gameObjectId == 1 || gameObjectId == 10 || gameObjectId == 12 ||
+                                      gameObjectId == 14 ||
+                                      gameObjectId == 16 || gameObjectId == 3 || gameObjectId == 6 ||
+                                      gameObjectId == 8))
+                            {
+                                drawObject = false;
+                            }
+                            //Ghosts
+                            else if (objectBankId == 12 && removeGhost)
+                            {
+                                drawObject = false;
+                            }
+                            //Robots
+                            else if (objectBankId == 13 && (gameObjectId == 7 || gameObjectId == 10))
+                            {
+                                drawObject = false;
+                            }
+                            //Robots (redirection)
+                            else if (objectBankId == 13)
+                            {
+                                //Lasers
+                                if (gameObjectId == 8 || gameObjectId == 11) gameObjectId++;
+                            }
+                            //Objects & Areas (redirection)
+                            else if (objectBankId == 15)
+                            {
+                                //Password switches
+                                if (gameObjectId >= 14 && gameObjectId <= 21)
+                                    gameObjectId = 13;
+                                //Disappearing blocks
+                                else if (gameObjectId >= 8 && gameObjectId <= 11)
+                                    gameObjectId -= 7;
+                                //Blue blocks
+                                else if (gameObjectId == 6)
+                                    drawObject = false;
+                                else if (gameObjectId == 7) gameObjectId = 6;
+                            }
+                            //Traps (redirections)
+                            else if (objectBankId == 6 && gameObjectId == 6)
+                            {
+                                objectBankId = 8;
+                            }
+                        }
+
+                        if (!drawObject) continue;
+                        using (var worldObject =
+                            new Bitmap(GetResourcePath($"Objects/Bank{objectBankId}/Object{gameObjectId}.png")))
+                        {
+                            worldObject.MakeTransparent(Color.FromArgb(255, 0, 255));
+                            var objectX = i % MapWidth * TileHeight;
+                            var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
+                            canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
+                                worldObject.Height);
+                        }
+                    }
+                }
+
+                if (withCoords)
+                {
+                    var rect = new Rectangle(0, 0, LayerWidth, LayerHeight);
+                    using (var gp = new GraphicsPath())
+                    using (var outline = new Pen(Color.Black, 2)
+                        {LineJoin = LineJoin.Round})
+                    using (var sf = new StringFormat())
+                    using (Brush foreBrush = new SolidBrush(Color.White))
+                    {
+                        gp.AddString($"Screen Coords: X={x} Y={y}", FontFamily.GenericMonospace,
+                            (int) FontStyle.Regular,
+                            16, rect, sf);
+                        canvas.ScaleTransform(1.3f, 1.35f);
+                        canvas.SmoothingMode = SmoothingMode.HighQuality;
+                        canvas.DrawPath(outline, gp);
+                        canvas.FillPath(foreBrush, gp);
+                    }
+                }
+            }
+
+            return screenRender;
+        }
+
+        /// <summary>
+        ///     Retrieves a tile from a screens layer.
+        /// </summary>
+        /// <param name="screenId"></param>
+        /// <param name="layer"></param>
+        /// <param name="tile"></param>
+        /// <returns></returns>
+        private int GetTile(int screenId, byte layer, int tile)
+        {
+            return _screens[screenId].Layers[layer][tile];
+        }
+
+        /// <summary>
+        ///     Looks in the supplied map folder for Custom Objects.
+        /// </summary>
+        /// <param name="resourceName"></param>
+        /// <returns></returns>
+        private string GetCustomResourcePath(string resourceName)
+        {
+            var customPath = Path.Combine(_mapPath, resourceName);
+            if (File.Exists(customPath)) return customPath;
+            Console.WriteLine(customPath);
+            return null;
+        }
+
+        /// <summary>
+        ///     Look's in the "Data" folder for a resource.
+        /// </summary>
+        /// <param name="resourceName"></param>
+        /// <returns></returns>
+        private string GetResourcePath(string resourceName)
+        {
+            var dataBasedPath = Path.Combine(_dataFolder, resourceName);
+            if (File.Exists(dataBasedPath)) return dataBasedPath;
+            Console.WriteLine(dataBasedPath);
+            return null;
         }
     }
 }

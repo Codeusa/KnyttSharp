@@ -31,14 +31,16 @@ namespace KnyttStories
                 var worldMap = new WorldMap(Path.Combine(outputFolder, worldReader.RootDirectory), knyttStoriesData);
                 if (worldMap.Load())
                 {
-                    Console.WriteLine($"Loaded {worldReader.RootDirectory} world map successfully.");
+                    Console.WriteLine($"Loaded: {worldMap.Name} by {worldMap.Author}");
                     Console.WriteLine(worldMap.Bounds.ToString());
                     Console.WriteLine($"Rendering world...");
-                    var worldRender = worldMap.Draw();
-                    if (worldRender != null)
+                    using (var worldRender = worldMap.Draw())
                     {
-                        worldRender.Save(Path.Combine(outputFolder, $"{worldReader.RootDirectory}_{DateTime.Now:yyyy-dd-M--HH-mm-ss}.png"));
-                        Console.WriteLine($"World render saved to {outputFolder}");
+                        if (worldRender != null)
+                        {
+                            worldRender.Save(Path.Combine(outputFolder, $"{worldReader.RootDirectory}_{DateTime.Now:yyyy-dd-M--HH-mm-ss}.png"));
+                            Console.WriteLine($"World render saved to {outputFolder}");
+                        }
                     }
                 }
             }
