@@ -338,150 +338,70 @@ namespace KnyttStories
                 for (var i = 0; i < 250; i++)
                 {
                     var gameObjectId = GetTile(screenId, layer, i);
-                    if (gameObjectId > 0)
+                    if (gameObjectId <= 0) continue;
+                    var objectBankId = GetTile(screenId, layer, i + 250);
+                    //custom Objects
+                    if (objectBankId == 255)
                     {
-                        var objectBankId = GetTile(screenId, layer, i + 250);
-
-                        //custom Objects
-                        if (objectBankId == 255)
+                        var customSection = $"Custom Object {gameObjectId}";
+                        var customImage = _ini.Read(customSection, "Image");
+                        if (string.IsNullOrWhiteSpace(customImage))
                         {
-                            var customSection = $"Custom Object {gameObjectId}";
-                            var customImage = _ini.Read(customSection, "Image");
-                            if (string.IsNullOrWhiteSpace(customImage))
-                            {
-                                Console.WriteLine(
-                                    $"Unable to locate information for Object ID {gameObjectId} in World Custom Objects");
-                                continue;
-                            }
-
-                            var customTileWidth = _ini.ReadInt(customSection, "Tile Width") ?? TileWidth;
-                            var customTileHeight = _ini.ReadInt(customSection, "Tile Height") ?? TileHeight;
-                            var customOffsetX = _ini.ReadInt(customSection, "Offset X") ?? 0;
-                            var customOffsetY = _ini.ReadInt(customSection, "Offset Y") ?? 0;
-                            var frame = _ini.ReadInt(customSection, "Init AnimFrom") ?? 0;
-
-                            using (var customGameObject =
-                                new Bitmap(GetCustomResourcePath($"Custom Objects/{customImage}")))
-                            {
-
-                                customGameObject.MakeTransparent(TransparentColor);
-                                var sourceX = frame %
-                                              (customGameObject.Width / customTileWidth) *
-                                              customTileWidth;
-
-                                var sourceY = (int) Math.Floor(frame /
-                                                               (customGameObject.Width /
-                                                                (double) customTileWidth)) *
-                                              customTileHeight;
-
-                                var destinationX = i % MapWidth * TileHeight + 12 -
-                                                   Math.Floor((double) customTileWidth / 2) +
-                                                   customOffsetX;
-
-                                var destinationY = Math.Floor((double) i / MapWidth) * TileHeight + 12 -
-                                                   Math.Floor((double) customTileHeight / 2) +
-                                                   customOffsetY;
-
-                                var customObjectBounds = new Rectangle((int) destinationX, (int) destinationY,
-                                    customTileWidth,
-                                    customTileHeight);
-
-                                canvas.DrawImage(customGameObject, customObjectBounds, sourceX,
-                                    sourceY, customTileWidth, customTileHeight,
-                                    GraphicsUnit.Pixel);
-                            }
-
+                            Console.WriteLine(
+                                $"Unable to locate information for Object ID {gameObjectId} in World Custom Objects");
                             continue;
                         }
 
-                        var drawObject = true;
-                        if (removeDebugObjects)
+                        var customTileWidth = _ini.ReadInt(customSection, "Tile Width") ?? TileWidth;
+                        var customTileHeight = _ini.ReadInt(customSection, "Tile Height") ?? TileHeight;
+                        var customOffsetX = _ini.ReadInt(customSection, "Offset X") ?? 0;
+                        var customOffsetY = _ini.ReadInt(customSection, "Offset Y") ?? 0;
+                        var frame = _ini.ReadInt(customSection, "Init AnimFrom") ?? 0;
+
+                        using (var customGameObject =
+                            new Bitmap(GetCustomResourcePath($"Custom Objects/{customImage}")))
                         {
-                            //System objects
-                            if (objectBankId == 0 &&
-                                (gameObjectId == 2 || gameObjectId >= 11 && gameObjectId <= 20 || gameObjectId >= 25))
-                            {
-                                drawObject = false;
-                            }
-                            // Ghost [X] Wall
-                            else if (objectBankId == 12 && gameObjectId == 17)
-                            {
-                                drawObject = false;
-                            }
-                            //Invisible
-                            else if (objectBankId == 16)
-                            {
-                                drawObject = false;
-                            }
-                            //Fly A B
-                            else if (objectBankId == 2 && (gameObjectId == 3 || gameObjectId == 4))
-                            {
-                                drawObject = false;
-                            }
-                            //Decoration
-                            else if (objectBankId == 8 && gameObjectId >= 15 && gameObjectId <= 17)
-                            {
-                                drawObject = false;
-                            }
-                            //Nature FX
-                            else if (objectBankId == 7 &&
-                                     (gameObjectId == 1 || gameObjectId == 10 || gameObjectId == 12 ||
-                                      gameObjectId == 14 ||
-                                      gameObjectId == 16 || gameObjectId == 3 || gameObjectId == 6 ||
-                                      gameObjectId == 8))
-                            {
-                                drawObject = false;
-                            }
-                            //Ghosts
-                            else if (objectBankId == 12 && removeGhost)
-                            {
-                                drawObject = false;
-                            }
-                            //Robots
-                            else if (objectBankId == 13 && (gameObjectId == 7 || gameObjectId == 10))
-                            {
-                                drawObject = false;
-                            }
-                            //Robots (redirection)
-                            else if (objectBankId == 13)
-                            {
-                                //Lasers
-                                if (gameObjectId == 8 || gameObjectId == 11) gameObjectId++;
-                            }
-                            //Objects & Areas (redirection)
-                            else if (objectBankId == 15)
-                            {
-                                //Password switches
-                                if (gameObjectId >= 14 && gameObjectId <= 21)
-                                    gameObjectId = 13;
-                                //Disappearing blocks
-                                else if (gameObjectId >= 8 && gameObjectId <= 11)
-                                    gameObjectId -= 7;
-                                //Blue blocks
-                                else if (gameObjectId == 6)
-                                    drawObject = false;
-                                else if (gameObjectId == 7) gameObjectId = 6;
-                            }
-                            //Traps (redirections)
-                            else if (objectBankId == 6 && gameObjectId == 6)
-                            {
-                                objectBankId = 8;
-                            }
+
+                            customGameObject.MakeTransparent(TransparentColor);
+                            var sourceX = frame %
+                                          (customGameObject.Width / customTileWidth) *
+                                          customTileWidth;
+
+                            var sourceY = (int) Math.Floor(frame /
+                                                           (customGameObject.Width /
+                                                            (double) customTileWidth)) *
+                                          customTileHeight;
+
+                            var destinationX = i % MapWidth * TileHeight + 12 -
+                                               Math.Floor((double) customTileWidth / 2) +
+                                               customOffsetX;
+
+                            var destinationY = Math.Floor((double) i / MapWidth) * TileHeight + 12 -
+                                               Math.Floor((double) customTileHeight / 2) +
+                                               customOffsetY;
+
+                            var customObjectBounds = new Rectangle((int) destinationX, (int) destinationY,
+                                customTileWidth,
+                                customTileHeight);
+
+                            canvas.DrawImage(customGameObject, customObjectBounds, sourceX,
+                                sourceY, customTileWidth, customTileHeight,
+                                GraphicsUnit.Pixel);
                         }
 
-                        if (!drawObject) continue;
-                        using (var worldObject =
-                            new Bitmap(GetResourcePath($"Objects/Bank{objectBankId}/Object{gameObjectId}.png")))
-                        {
-                            worldObject.MakeTransparent(TransparentColor);
-                            var objectX = i % MapWidth * TileHeight;
-                            var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
-                            canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
-                                worldObject.Height);
-                        }
+                        continue;
+                    }
+                    if (!CanDraw(ref objectBankId, ref gameObjectId, removeGhost)) continue;
+                    using (var worldObject =
+                        new Bitmap(GetResourcePath($"Objects/Bank{objectBankId}/Object{gameObjectId}.png")))
+                    {
+                        worldObject.MakeTransparent(TransparentColor);
+                        var objectX = i % MapWidth * TileHeight;
+                        var objectY = (int) Math.Floor((double) (i / MapWidth)) * TileHeight;
+                        canvas.DrawImage(worldObject, objectX, objectY, worldObject.Width,
+                            worldObject.Height);
                     }
                 }
-
                 if (withCoords)
                 {
                     var rect = new Rectangle(0, 0, LayerWidth, LayerHeight);
@@ -489,7 +409,7 @@ namespace KnyttStories
                     using (var outline = new Pen(Color.Black, 2)
                         {LineJoin = LineJoin.Round})
                     using (var sf = new StringFormat())
-                    using (Brush foreBrush = new SolidBrush(Color.White))
+                    using (var foreBrush = new SolidBrush(Color.White))
                     {
                         gp.AddString($"Screen Coords: X={x} Y={y}", FontFamily.GenericMonospace,
                             (int) FontStyle.Regular,
@@ -540,6 +460,121 @@ namespace KnyttStories
             if (File.Exists(dataBasedPath)) return dataBasedPath;
             Console.WriteLine(dataBasedPath);
             return null;
+        }
+
+        /// <summary>
+        /// Hard coded values to handle filter out certain objects, or banks entirely. 
+        /// </summary>
+        /// <param name="objectBankId"></param>
+        /// <param name="gameObjectId"></param>
+        /// <param name="removeGhost"></param>
+        /// <returns></returns>
+        private static bool CanDraw(ref int objectBankId, ref int gameObjectId, bool removeGhost)
+        {
+            if (objectBankId == 0)
+            {
+                //System objects
+                if ((gameObjectId == 2 || gameObjectId >= 11 && gameObjectId <= 20 || gameObjectId >= 25))
+                {
+                    return false;
+                }
+            }
+            if (objectBankId == 12)
+            {
+                // Ghost [X] Wall / Ghost
+                if (gameObjectId == 17 || removeGhost)
+                {
+                    return false;
+                }
+            }
+            //Invisible
+            if (objectBankId == 16)
+            {
+                return false;
+            }
+            if (objectBankId == 2)
+            {
+                //Fly A B
+                if ((gameObjectId == 3 || gameObjectId == 4))
+                {
+                    return false;
+                }
+            }
+            if (objectBankId == 8)
+            {
+                //Decoration
+                if (gameObjectId >= 15 && gameObjectId <= 17)
+                {
+                    return false;
+                }
+            }
+            if (objectBankId == 7)
+            {
+                //Nature FX
+                if (gameObjectId
+                    == 1
+                    || gameObjectId == 10
+                    || gameObjectId == 12
+                    || gameObjectId == 14
+                    || gameObjectId == 16
+                    || gameObjectId == 3
+                    || gameObjectId == 6
+                    || gameObjectId == 8)
+                {
+                    return false;
+                }
+            }
+            if (objectBankId == 13)
+            {
+                //Robots
+                if ((gameObjectId == 7 || gameObjectId == 10))
+                {
+                    return false;
+                }
+                //Robots (redirection) -> Lasers
+                if (gameObjectId == 8 || gameObjectId == 11)
+                {
+                    gameObjectId++;
+                    return true;
+                }
+            }
+            //Objects & Areas (redirection)
+            if (objectBankId == 15)
+            {
+                //Password switches
+                if (gameObjectId >= 14 && gameObjectId <= 21)
+                {
+                    gameObjectId = 13;
+                    return true;
+                }
+                //Disappearing blocks
+                if (gameObjectId >= 8 && gameObjectId <= 11)
+                {
+                    gameObjectId -= 7;
+                    return true;
+                }
+                //Blue blocks
+                if (gameObjectId == 6)
+                {
+                    return false;
+                }
+                //Red blocks
+                if (gameObjectId == 7)
+                {
+                    gameObjectId = 6;
+                    return true;
+                }
+            }
+            //Traps (redirections)
+            if (objectBankId == 6)
+            {
+                if (gameObjectId == 6)
+                {
+                    objectBankId = 8;
+                    return true;
+                }
+            }
+            return true;
         }
     }
 }
